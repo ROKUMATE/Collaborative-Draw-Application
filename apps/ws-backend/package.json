@@ -4,16 +4,20 @@
     "description": "",
     "main": "index.js",
     "scripts": {
+        "db:generate": "cd packages/db && npx prisma generate",
+        "start:websocket": "cd apps/ws-backend && pnpm run dev",
         "dev": "tsc -b && node ./dist/index.js",
         "build": "tsc -b",
         "start": "node ./dist/index.js"
     },
     "devDependencies": {
         "@repo/typescript-config": "workspace:*",
-        "@types/ws": "^8.5.14"
+        "@repo/backend-common": "workspace:*",
+        "@types/ws": "^8.5.14",
+        "@types/jsonwebtoken": "^9.0.8",
+        "@repo/common": "workspace:*"
     },
     "dependencies": {
-        "@types/jsonwebtoken": "^9.0.8",
         "jsonwebtoken": "^9.0.2",
         "ws": "^8.18.0",
         "zod": "^3.24.1"
