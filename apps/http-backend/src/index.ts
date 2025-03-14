@@ -23,7 +23,6 @@ app.use(cors());
 //     }
 // }
 
-// SignIn Endpoint
 app.post('/sign-in', async (req, res) => {
     const data = createUserSchema.safeParse(req.body);
     if (!data.success) {
@@ -40,10 +39,9 @@ app.post('/sign-in', async (req, res) => {
     try {
         const User = await prismaClient.user.create({
             data: {
-                email: data.data?.username,
+                email: userDetails.username,
                 password: hashedPassword,
-                name: data.data.name,
-                photo: '',
+                name: userDetails.name,
             },
         });
         if (!User) {
@@ -69,7 +67,6 @@ app.post('/sign-in', async (req, res) => {
         });
     }
 });
-// SignUp Endpoint
 app.post('/sign-up', async (req, res) => {
     const data = signInSchema.safeParse(req.body);
     if (!data.success) {
@@ -127,7 +124,6 @@ app.post('/sign-up', async (req, res) => {
         });
     }
 });
-// Room Creation
 app.post('/create-room', userValidation, async (req, res) => {
     const data = createRoomSchema.safeParse(req.body);
     if (!data.success) {
@@ -160,7 +156,6 @@ app.post('/create-room', userValidation, async (req, res) => {
         return;
     }
 });
-// Getting a particular rooms chats
 app.get('/chat/:roomID', async (req, res) => {
     try {
         const roomID = Number(req.params.roomID);
@@ -194,7 +189,7 @@ app.get('/chat/:roomID', async (req, res) => {
             },
             take: 1000,
         });
-        res.status(400).json({
+        res.status(200).json({
             body: {
                 message: {
                     chatMessages: chats,
@@ -209,7 +204,6 @@ app.get('/chat/:roomID', async (req, res) => {
         });
     }
 });
-
 app.get('/room/:slug', async (req, res) => {
     const slug = req.params.slug;
     const room = await prismaClient.room.findFirst({

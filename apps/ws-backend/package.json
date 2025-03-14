@@ -13,7 +13,8 @@
         "@repo/backend-common": "workspace:*",
         "@types/ws": "^8.5.14",
         "@types/jsonwebtoken": "^9.0.8",
-        "@repo/common": "workspace:*"
+        "@repo/common": "workspace:*",
+        "@repo/db": "workspace:*"
     },
     "dependencies": {
         "jsonwebtoken": "^9.0.2",
