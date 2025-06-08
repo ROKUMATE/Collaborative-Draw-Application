@@ -190,7 +190,7 @@ export default function HomeRoomID() {
 
             {/* Toolbar */}
             <div
-                className={`fixed top-20 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-lg shadow-lg p-2 flex gap-2`}>
+                className={`fixed top-28 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-lg shadow-lg p-2 flex gap-2`}>
                 {(
                     [
                         { name: "select", icon: Mouse },
@@ -236,7 +236,7 @@ export default function HomeRoomID() {
             </div>
 
             {/* Canvas */}
-            <div className="flex items-center justify-center pt-32">
+            <div className="flex items-center justify-center pt-44">
                 <canvas
                     ref={canvasRef}
                     onMouseDown={startDrawing}
