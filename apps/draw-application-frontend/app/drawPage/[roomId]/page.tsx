@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import axios from "axios"; // Add Axios for HTTP requests
+import axios from "axios";
 import {
     Pencil,
     Square,
@@ -12,6 +12,8 @@ import {
     Redo,
     Mouse,
 } from "lucide-react";
+import { useParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 type Tool = "select" | "pencil" | "rectangle" | "circle" | "eraser";
 type DrawingPath = {
@@ -19,8 +21,9 @@ type DrawingPath = {
     path: { x: number; y: number }[];
 };
 
-function HomeRoomID({ params }: { params: { roomId: string } }) {
-    const roomId = params.roomId;
+export default function HomeRoomID() {
+    const { roomId } = useParams<{ roomId: string }>();
+    const { token } = useAuth();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [currentTool, setCurrentTool] = useState<Tool>("pencil");
@@ -31,55 +34,56 @@ function HomeRoomID({ params }: { params: { roomId: string } }) {
     const [undoStack, setUndoStack] = useState<DrawingPath[][]>([]);
     const [redoStack, setRedoStack] = useState<DrawingPath[][]>([]);
 
+    /* fetch saved strokes */
     useEffect(() => {
-        // Fetch strokes from the backend when the component mounts
         axios
-            .get(`/api/rooms/${roomId}/strokes`)
-            .then((response) => setPaths(response.data))
-            .catch((error) => console.error("Error fetching strokes:", error));
+            .get(`http://localhost:3003/rooms/${roomId}/strokes`)
+            .then((res) => {
+                // res.data is Array<{ id, roomId, userId, data: { tool, path }, createdAt }>
+                const strokes: DrawingPath[] = res.data
+                    .map((rec: any) => rec.data)
+                    // (optionally) filter out any malformed entries:
+                    .filter(
+                        (d: any): d is DrawingPath =>
+                            typeof d.tool === "string" &&
+                            Array.isArray(d.path) &&
+                            d.path.length > 0
+                    );
+                setPaths(strokes);
+            })
+            .catch((err) => console.error("Error fetching strokes:", err));
     }, [roomId]);
 
+    /* redraw canvas whenever paths change */
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // Set canvas size
         canvas.width = window.innerWidth * 0.8;
         canvas.height = window.innerHeight * 0.8;
 
-        // Clear canvas
         ctx.fillStyle = "#fff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Draw all paths
-        paths.forEach(({ tool, path }) => {
-            if (path.length < 2) return;
+        console.log("paths: ", paths);
 
+        paths.forEach(({ tool, path }) => {
+            console.log("path ", path);
+            if (path.length < 2) return;
             ctx.beginPath();
             ctx.moveTo(path[0].x, path[0].y);
 
             if (tool === "pencil" || tool === "eraser") {
-                path.forEach((point) => ctx.lineTo(point.x, point.y));
+                path.forEach((p) => ctx.lineTo(p.x, p.y));
             } else if (tool === "rectangle") {
-                const startPoint = path[0];
-                const endPoint = path[path.length - 1];
-                ctx.rect(
-                    startPoint.x,
-                    startPoint.y,
-                    endPoint.x - startPoint.x,
-                    endPoint.y - startPoint.y
-                );
+                const [start, end] = [path[0], path[path.length - 1]];
+                ctx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
             } else if (tool === "circle") {
-                const startPoint = path[0];
-                const endPoint = path[path.length - 1];
-                const radius = Math.sqrt(
-                    Math.pow(endPoint.x - startPoint.x, 2) +
-                        Math.pow(endPoint.y - startPoint.y, 2)
-                );
-                ctx.arc(startPoint.x, startPoint.y, radius, 0, 2 * Math.PI);
+                const [start, end] = [path[0], path[path.length - 1]];
+                const r = Math.hypot(end.x - start.x, end.y - start.y);
+                ctx.arc(start.x, start.y, r, 0, 2 * Math.PI);
             }
 
             ctx.strokeStyle = tool === "eraser" ? "#fff" : "#000";
@@ -88,70 +92,59 @@ function HomeRoomID({ params }: { params: { roomId: string } }) {
         });
     }, [paths]);
 
+    /* pointer handlers */
     const startDrawing = (e: React.MouseEvent) => {
         if (currentTool === "select") return;
-
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
+        const rect = canvasRef.current!.getBoundingClientRect();
         setIsDrawing(true);
-        setCurrentPath([{ x, y }]);
+        setCurrentPath([{ x: e.clientX - rect.left, y: e.clientY - rect.top }]);
     };
-
     const draw = (e: React.MouseEvent) => {
         if (!isDrawing || currentTool === "select") return;
-
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        setCurrentPath((prev) => [...prev, { x, y }]);
+        const rect = canvasRef.current!.getBoundingClientRect();
+        setCurrentPath((prev) => [
+            ...prev,
+            { x: e.clientX - rect.left, y: e.clientY - rect.top },
+        ]);
     };
-
     const stopDrawing = () => {
         if (!isDrawing) return;
         setIsDrawing(false);
 
-        const newPath = { tool: currentTool, path: currentPath };
-        setPaths((prev) => [...prev, newPath]);
-        setUndoStack((prevUndo) => [...prevUndo, paths]);
+        const newStroke = { tool: currentTool, path: currentPath };
+        setUndoStack((u) => [...u, paths]);
         setRedoStack([]);
+        setPaths((prev) => [...prev, newStroke]);
 
-        // Send the new path to the backend
         axios
-            .post(`/api/rooms/${roomId}/strokes`, newPath)
-            .catch((error) => console.error("Error saving stroke:", error));
+            .post(`http://localhost:3003/rooms/${roomId}/strokes`, newStroke, {
+                headers: {
+                    authorization:
+                        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySUQiOiI2MTdhNWViMi01M2NjLTRkNmMtYTNiZi02YWZlNGVlN2ZmYTIiLCJpYXQiOjE3NDk0MTA0OTR9.08iz7iZUPuiTT3SKVFklFsZJRen0r4UYivUC6WATzjM",
+                },
+            })
+            .catch((err) => console.error("Error saving stroke:", err));
     };
 
+    /* toolbar actions */
     const handleUndo = () => {
-        if (undoStack.length === 0) return;
-        const previousPaths = undoStack[undoStack.length - 1];
-        setUndoStack((prev) => prev.slice(0, -1));
-        setRedoStack((prev) => [...prev, paths]);
-        setPaths(previousPaths);
+        if (!undoStack.length) return;
+        const prev = undoStack[undoStack.length - 1];
+        setRedoStack((r) => [...r, paths]);
+        setUndoStack((u) => u.slice(0, -1));
+        setPaths(prev);
     };
-
     const handleRedo = () => {
-        if (redoStack.length === 0) return;
-        const nextPaths = redoStack[redoStack.length - 1];
-        setRedoStack((prev) => prev.slice(0, -1));
-        setUndoStack((prev) => [...prev, paths]);
-        setPaths(nextPaths);
+        if (!redoStack.length) return;
+        const next = redoStack[redoStack.length - 1];
+        setUndoStack((u) => [...u, paths]);
+        setRedoStack((r) => r.slice(0, -1));
+        setPaths(next);
     };
-
     const handleDownload = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
         const link = document.createElement("a");
         link.download = "drawing.png";
-        link.href = canvas.toDataURL();
+        link.href = canvasRef.current!.toDataURL();
         link.click();
     };
 
@@ -159,30 +152,36 @@ function HomeRoomID({ params }: { params: { roomId: string } }) {
         <div className="min-h-screen bg-gray-100">
             {/* Toolbar */}
             <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-2 flex gap-2">
-                {/* Toolbar Buttons */}
-                {tools.map((tool) => (
+                {(
+                    [
+                        { name: "select", icon: Mouse },
+                        { name: "pencil", icon: Pencil },
+                        { name: "rectangle", icon: Square },
+                        { name: "circle", icon: Circle },
+                        { name: "eraser", icon: Eraser },
+                    ] as const
+                ).map(({ name, icon: Icon }) => (
                     <button
-                        key={tool.name}
-                        onClick={() => setCurrentTool(tool.name as Tool)}
+                        key={name}
+                        onClick={() => setCurrentTool(name)}
                         className={`p-2 rounded ${
-                            currentTool === tool.name
+                            currentTool === name
                                 ? "bg-blue-100 text-blue-600"
                                 : "hover:bg-gray-100"
                         }`}>
-                        <tool.icon size={20} />
+                        <Icon size={20} />
                     </button>
                 ))}
-                {/* Undo, Redo, Download */}
                 <button
                     onClick={handleUndo}
-                    className="p-2 rounded hover:bg-gray-100"
-                    disabled={undoStack.length === 0}>
+                    disabled={!undoStack.length}
+                    className="p-2 rounded hover:bg-gray-100">
                     <Undo size={20} />
                 </button>
                 <button
                     onClick={handleRedo}
-                    className="p-2 rounded hover:bg-gray-100"
-                    disabled={redoStack.length === 0}>
+                    disabled={!redoStack.length}
+                    className="p-2 rounded hover:bg-gray-100">
                     <Redo size={20} />
                 </button>
                 <button
@@ -206,5 +205,3 @@ function HomeRoomID({ params }: { params: { roomId: string } }) {
         </div>
     );
 }
-
-export default HomeRoomID;

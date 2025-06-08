@@ -109,5 +109,29 @@ wss.on("connection", function connection(ws, request) {
                 }
             });
         }
+
+        if (parsedData.type === "stroke") {
+            const { roomId, stroke } = parsedData as {
+                type: "stroke";
+                roomId: string;
+                stroke: { tool: string; path: { x: number; y: number }[] };
+            };
+
+            await prismaClient.strokes.create({
+                data: {
+                    roomId: Number(roomId),
+                    userId,
+                    data: stroke,
+                },
+            });
+
+            users.forEach((u) => {
+                if (u.rooms.includes(roomId)) {
+                    u.ws.send(
+                        JSON.stringify({ type: "stroke", roomId, stroke })
+                    );
+                }
+            });
+        }
     });
 });

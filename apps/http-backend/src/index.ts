@@ -223,5 +223,77 @@ app.get("/room/:slug", async (req, res) => {
         room,
     });
 });
+// GET all strokes in a room
+app.get("/rooms/:roomId/strokes", async (req, res) => {
+    const roomId = Number(req.params.roomId);
+    console.log("roomId selected is --> ", roomId);
+    if (isNaN(roomId)) {
+        res.status(400).json({ message: "Invalid roomId" });
+        return;
+    }
+
+    try {
+        const strokes = await prismaClient.strokes.findMany({
+            where: { roomId },
+            orderBy: { createdAt: "asc" },
+        });
+
+        res.status(200).json(strokes);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to fetch strokes" });
+    }
+});
+
+// POST a new stroke into a room
+// POST a new stroke into a room (with auto-room-creation)
+app.post("/rooms/:roomId/strokes", userValidation, async (req, res) => {
+    const roomId = Number(req.params.roomId);
+    if (isNaN(roomId)) {
+        res.status(400).json({ message: "Invalid roomId" });
+    }
+
+    const userId = (req as any).userID as string;
+    const strokeData = req.body as {
+        tool: string;
+        path: { x: number; y: number }[];
+    };
+    if (!strokeData || !strokeData.tool || !Array.isArray(strokeData.path)) {
+        res.status(400).json({ message: "Invalid stroke payload" });
+    }
+
+    try {
+        // 2. Ensure the room exists
+        let room = await prismaClient.room.findUnique({
+            where: { id: roomId },
+        });
+
+        if (!room) {
+            // 3. Auto-create a new room record
+            room = await prismaClient.room.create({
+                data: {
+                    // override auto-inc ID; most dialects allow setting explicit IDs even on auto-inc columns
+                    id: roomId,
+                    slug: `room-${roomId}`,
+                    adminId: userId,
+                },
+            });
+        }
+
+        // 4. Persist the stroke
+        const stroke = await prismaClient.strokes.create({
+            data: {
+                roomId: room.id,
+                userId,
+                data: strokeData,
+            },
+        });
+
+        res.status(201).json(stroke);
+    } catch (err) {
+        console.error("POST /rooms/:roomId/strokes error:", err);
+        res.status(500).json({ message: "Failed to save stroke" });
+    }
+});
 
 app.listen(3003, () => console.log("port running at 3003"));
