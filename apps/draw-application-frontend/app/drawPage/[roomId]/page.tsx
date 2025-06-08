@@ -11,9 +11,14 @@ import {
     Undo,
     Redo,
     Mouse,
+    Sun,
+    Moon,
+    Home,
+    Users,
 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 
 type Tool = "select" | "pencil" | "rectangle" | "circle" | "eraser";
 type DrawingPath = {
@@ -23,7 +28,9 @@ type DrawingPath = {
 
 export default function HomeRoomID() {
     const { roomId } = useParams<{ roomId: string }>();
-    const { token } = useAuth();
+    const { token, user } = useAuth();
+    const { theme, toggleTheme } = useTheme();
+    const router = useRouter();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [currentTool, setCurrentTool] = useState<Tool>("pencil");
@@ -39,10 +46,8 @@ export default function HomeRoomID() {
         axios
             .get(`http://localhost:3003/rooms/${roomId}/strokes`)
             .then((res) => {
-                // res.data is Array<{ id, roomId, userId, data: { tool, path }, createdAt }>
                 const strokes: DrawingPath[] = res.data
                     .map((rec: any) => rec.data)
-                    // (optionally) filter out any malformed entries:
                     .filter(
                         (d: any): d is DrawingPath =>
                             typeof d.tool === "string" &&
@@ -119,8 +124,7 @@ export default function HomeRoomID() {
         axios
             .post(`http://localhost:3003/rooms/${roomId}/strokes`, newStroke, {
                 headers: {
-                    authorization:
-                        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySUQiOiI2MTdhNWViMi01M2NjLTRkNmMtYTNiZi02YWZlNGVlN2ZmYTIiLCJpYXQiOjE3NDk0MTA0OTR9.08iz7iZUPuiTT3SKVFklFsZJRen0r4UYivUC6WATzjM",
+                    authorization: `${token}`,
                 },
             })
             .catch((err) => console.error("Error saving stroke:", err));
@@ -149,9 +153,44 @@ export default function HomeRoomID() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-100">
+        <div
+            className={`min-h-screen ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-100 text-black"}`}>
+            {/* Navigation Bar */}
+            <nav
+                className={`fixed top-0 left-0 right-0 h-16 ${theme === "dark" ? "bg-gray-800" : "bg-white"} shadow-md z-50`}>
+                <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => router.push("/")}
+                            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}>
+                            <Home size={20} />
+                        </button>
+                        <span className="font-semibold">Room: {roomId}</span>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        {user && (
+                            <div
+                                className={`flex items-center space-x-2 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                                <Users size={20} />
+                                <span>{user.username}</span>
+                            </div>
+                        )}
+                        <button
+                            onClick={toggleTheme}
+                            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}>
+                            {theme === "dark" ? (
+                                <Sun size={20} />
+                            ) : (
+                                <Moon size={20} />
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
             {/* Toolbar */}
-            <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-2 flex gap-2">
+            <div
+                className={`fixed top-20 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-lg shadow-lg p-2 flex gap-2`}>
                 {(
                     [
                         { name: "select", icon: Mouse },
@@ -166,40 +205,45 @@ export default function HomeRoomID() {
                         onClick={() => setCurrentTool(name)}
                         className={`p-2 rounded ${
                             currentTool === name
-                                ? "bg-blue-100 text-blue-600"
-                                : "hover:bg-gray-100"
+                                ? theme === "dark"
+                                    ? "bg-blue-900 text-blue-300"
+                                    : "bg-blue-100 text-blue-600"
+                                : theme === "dark"
+                                  ? "hover:bg-gray-700"
+                                  : "hover:bg-gray-100"
                         }`}>
                         <Icon size={20} />
                     </button>
                 ))}
+                <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
                 <button
                     onClick={handleUndo}
                     disabled={!undoStack.length}
-                    className="p-2 rounded hover:bg-gray-100">
+                    className={`p-2 rounded ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}>
                     <Undo size={20} />
                 </button>
                 <button
                     onClick={handleRedo}
                     disabled={!redoStack.length}
-                    className="p-2 rounded hover:bg-gray-100">
+                    className={`p-2 rounded ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}>
                     <Redo size={20} />
                 </button>
                 <button
                     onClick={handleDownload}
-                    className="p-2 rounded hover:bg-gray-100">
+                    className={`p-2 rounded ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}>
                     <Download size={20} />
                 </button>
             </div>
 
             {/* Canvas */}
-            <div className="flex items-center justify-center pt-20">
+            <div className="flex items-center justify-center pt-32">
                 <canvas
                     ref={canvasRef}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
                     onMouseLeave={stopDrawing}
-                    className="bg-white rounded-lg shadow-lg cursor-crosshair"
+                    className={`${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-lg shadow-lg cursor-crosshair`}
                 />
             </div>
         </div>
