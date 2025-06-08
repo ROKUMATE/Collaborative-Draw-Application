@@ -5,6 +5,9 @@ import { prismaClient } from "@repo/db/db";
 
 const wss = new WebSocketServer({ port: 8080 });
 
+/**
+ *  Bad Way of making the ws filled with state and local data management!
+ */
 interface User {
     ws: WebSocket;
     rooms: string[];
@@ -13,6 +16,9 @@ interface User {
 
 const users: User[] = [];
 
+/* 
+    Checking for the Authentication of the user by the jwt token
+*/
 function checkUser(token: string): string | null {
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -35,25 +41,42 @@ wss.on("connection", function connection(ws, request) {
         ws.close();
         return null;
     }
-
+    /**
+     * Adding the user to the ws array list
+     */
     users.push({
         userId,
         rooms: [],
         ws,
     });
 
-    console.log("userID ->", userId);
+    console.log("userID of the user connected ->", userId);
 
     ws.on("message", async function message(data) {
         const parsedData = JSON.parse(data as unknown as string);
         console.log("parsedData -> ", parsedData);
+
         // Joining the room
+        /**
+         * JSON Data 
+            {
+                "type": "join_room",
+                "roomId": "2"
+            }
+         */
         if (parsedData.type === "join_room") {
             const user = users.find((x) => x.ws === ws);
             user?.rooms.push(parsedData.roomId);
         }
 
         // Leaving the room
+        /**
+         * JSON DATA
+            {
+                "type": "leave_room",
+                "roomId": "1"
+            }
+         */
         if (parsedData.type === "leave_room") {
             const user = users.find((x) => x.ws === ws);
             if (!user) return;
@@ -61,6 +84,13 @@ wss.on("connection", function connection(ws, request) {
         }
 
         // Chating
+        /** JSON DATA
+            {
+                "type": "chat",
+                "roomId": "1",
+                "message": "Chatting message" 
+            }
+         */
         if (parsedData.type === "chat") {
             const roomId = parsedData.roomId;
             const message = parsedData.message;

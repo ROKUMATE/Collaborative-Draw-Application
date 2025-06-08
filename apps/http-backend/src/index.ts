@@ -15,14 +15,13 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// declare global {
-//     namespace Express {
-//         interface Request {
-//             userID?: string;
-//         }
-//     }
-// }
-
+/** JSON DATA --- Sign-in -- Creating new user
+    {
+        "username": "String",
+        "password": "String",
+        "name": "String"
+    }
+ */
 app.post("/sign-in", async (req, res) => {
     const data = createUserSchema.safeParse(req.body);
     if (!data.success) {
@@ -67,6 +66,13 @@ app.post("/sign-in", async (req, res) => {
         });
     }
 });
+
+/** JSON DATA --- Sign-up -- login  user
+    {
+        "username": "String",
+        "password": "String",
+    }
+ */
 app.post("/sign-up", async (req, res) => {
     const data = signInSchema.safeParse(req.body);
     if (!data.success) {

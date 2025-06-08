@@ -1,4 +1,6 @@
-import React from 'react';
+"use client";
+
+import React, { useEffect, useState } from "react";
 import {
     ArrowRight,
     Pencil,
@@ -6,9 +8,23 @@ import {
     Users2,
     Sparkles,
     Github,
-} from 'lucide-react';
+} from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "../context/AuthContext";
+// import { useRouter } from "next/navigation";
 
 function App() {
+    const { token, user } = useAuth();
+    // console.log("token ---> ", token);
+    // const router = useRouter();
+    const [authenticated, setAuthenticated] = useState<boolean>(false);
+    useEffect(() => {
+        if (!token || !user) {
+            setAuthenticated(false);
+        } else {
+            setAuthenticated(true);
+        }
+    }, [token, user]);
     return (
         <div className="min-h-screen bg-gray-900">
             {/* Navigation */}
@@ -33,14 +49,33 @@ function App() {
                                 Blog
                             </a>
                             <a
-                                href="https://github.com"
+                                href="http://github.com/ROKUMATE/collaborative-Draw-Application/"
                                 target="_blank"
                                 rel="noopener noreferrer">
                                 <Github className="h-5 w-5 text-gray-400 hover:text-white transition-colors" />
                             </a>
                             <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                                Open App
+                                <Link href={"/drawPage"}>Open App</Link>
                             </button>
+                            {authenticated ? (
+                                <button className="ml-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                                    <span className="flex items-center">
+                                        <Users2 className="h-4 w-4 mr-2" />
+                                        {user?.username || "Profile"}
+                                    </span>
+                                </button>
+                            ) : (
+                                <>
+                                    <button className="ml-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+                                        <span className="flex items-center">
+                                            <Users2 className="h-4 w-4 mr-2" />
+                                            <Link href="/sign-in">
+                                                {user?.username || "Signup"}
+                                            </Link>
+                                        </span>
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -53,7 +88,7 @@ function App() {
                         <h1 className="text-5xl font-bold text-white mb-6">
                             The whiteboard you'll
                             <span className="text-blue-500">
-                                {' '}
+                                {" "}
                                 actually want to use
                             </span>
                         </h1>
@@ -64,7 +99,7 @@ function App() {
                         </p>
                         <div className="flex justify-center space-x-4">
                             <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
-                                Start Drawing{' '}
+                                <Link href="/drawPage">Start Drawing </Link>
                                 <ArrowRight className="ml-2 h-5 w-5" />
                             </button>
                             <button className="border border-gray-700 text-gray-300 px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors">

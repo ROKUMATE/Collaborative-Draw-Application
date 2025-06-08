@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import axios from "axios"; // Add Axios for HTTP requests
 import {
     Pencil,
     Square,
@@ -18,7 +19,8 @@ type DrawingPath = {
     path: { x: number; y: number }[];
 };
 
-function Home() {
+function HomeRoomID({ params }: { params: { roomId: string } }) {
+    const roomId = params.roomId;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [currentTool, setCurrentTool] = useState<Tool>("pencil");
@@ -29,13 +31,13 @@ function Home() {
     const [undoStack, setUndoStack] = useState<DrawingPath[][]>([]);
     const [redoStack, setRedoStack] = useState<DrawingPath[][]>([]);
 
-    const tools = [
-        { name: "select", icon: Mouse },
-        { name: "pencil", icon: Pencil },
-        { name: "rectangle", icon: Square },
-        { name: "circle", icon: Circle },
-        { name: "eraser", icon: Eraser },
-    ];
+    useEffect(() => {
+        // Fetch strokes from the backend when the component mounts
+        axios
+            .get(`/api/rooms/${roomId}/strokes`)
+            .then((response) => setPaths(response.data))
+            .catch((error) => console.error("Error fetching strokes:", error));
+    }, [roomId]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -60,9 +62,7 @@ function Home() {
             ctx.moveTo(path[0].x, path[0].y);
 
             if (tool === "pencil" || tool === "eraser") {
-                path.forEach((point) => {
-                    ctx.lineTo(point.x, point.y);
-                });
+                path.forEach((point) => ctx.lineTo(point.x, point.y));
             } else if (tool === "rectangle") {
                 const startPoint = path[0];
                 const endPoint = path[path.length - 1];
@@ -118,15 +118,16 @@ function Home() {
     const stopDrawing = () => {
         if (!isDrawing) return;
         setIsDrawing(false);
-        setPaths((prev) => {
-            const newPaths = [
-                ...prev,
-                { tool: currentTool, path: currentPath },
-            ];
-            setUndoStack((prevUndo) => [...prevUndo, prev]);
-            setRedoStack([]);
-            return newPaths;
-        });
+
+        const newPath = { tool: currentTool, path: currentPath };
+        setPaths((prev) => [...prev, newPath]);
+        setUndoStack((prevUndo) => [...prevUndo, paths]);
+        setRedoStack([]);
+
+        // Send the new path to the backend
+        axios
+            .post(`/api/rooms/${roomId}/strokes`, newPath)
+            .catch((error) => console.error("Error saving stroke:", error));
     };
 
     const handleUndo = () => {
@@ -158,6 +159,7 @@ function Home() {
         <div className="min-h-screen bg-gray-100">
             {/* Toolbar */}
             <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-2 flex gap-2">
+                {/* Toolbar Buttons */}
                 {tools.map((tool) => (
                     <button
                         key={tool.name}
@@ -170,7 +172,7 @@ function Home() {
                         <tool.icon size={20} />
                     </button>
                 ))}
-                <div className="w-px bg-gray-200 mx-2" />
+                {/* Undo, Redo, Download */}
                 <button
                     onClick={handleUndo}
                     className="p-2 rounded hover:bg-gray-100"
@@ -183,7 +185,6 @@ function Home() {
                     disabled={redoStack.length === 0}>
                     <Redo size={20} />
                 </button>
-                <div className="w-px bg-gray-200 mx-2" />
                 <button
                     onClick={handleDownload}
                     className="p-2 rounded hover:bg-gray-100">
@@ -206,4 +207,4 @@ function Home() {
     );
 }
 
-export default Home;
+export default HomeRoomID;
